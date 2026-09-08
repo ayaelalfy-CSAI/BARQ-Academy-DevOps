@@ -497,3 +497,65 @@ done
 
 - Remaining Uncertainty:
 The instance ID configuration will be corrected by this change. The final load-balancing behavior should be confirmed through repeated requests to the NGINX public endpoint.
+
+
+## 10 / 2026-09-08
+
+- Symptom:
+The `/ready` endpoint returned HTTP 503 and reported PostgreSQL and Redis as unavailable:
+
+HTTP/1.1 503 SERVICE UNAVAILABLE
+
+{"dependencies":{"postgres":"unavailable","redis":"unavailable"},"instance_id":"app-01","service":"barq-api","status":"not_ready","version":"2.0.0"}
+
+- Hypothesis:
+The application could reach the dependency containers, but the connection URLs in DATABASE_URL and REDIS_URL might contain incorrect internal ports or database credentials.
+
+- Investigation:
+Verified that PostgreSQL and Redis containers were running and healthy:
+docker compose -p barq-assessment ps -a
+Verified PostgreSQL DNS resolution and TCP connectivity from app-01:
+docker exec app-01 python -c "import socket; print(socket.gethostbyname('postgres')); print(socket.create_connection(('postgres',5432),2))"
+
+DATABASE_URL=postgresql://barq_app:BarqLabOnly_7qN2vK8d@postgres:5433/barq_tasks
+REDIS_URL=redis://redis:6380/0
+
+- Root Cause:
+The application was configured with incorrect internal dependency connection details.
+DATABASE_URL initially used PostgreSQL port 5433 instead of the container's internal port 5432.
+REDIS_URL initially used Redis port 6380 instead of the container's internal port 6379.
+After correcting the PostgreSQL port, the PostgreSQL connection still failed because the password in DATABASE_URL did not match the configured PostgreSQL password.
+
+- Fix:
+Updated config/app.env
+PostgreSQL:
+postgres:5433 → postgres:5432
+Redis:
+redis:6380 → redis:6379
+PostgreSQL password:
+...K8d → ...K8c
+
+- Recreated the application containers:
+docker compose -p barq-assessment up -d --force-recreate app-01 app-02
+
+- Retest:
+curl -i httHTTP/1.1 200 OK
+output:
+Server: nginx/1.28.3
+Date: Tue, 08 Sep 2026 17:01:53 GMT
+Content-Type: application/json
+Content-Length: 133
+Connection: keep-alive
+X-Instance-ID: app-01
+X-Request-ID: 8ca90142fc7bc91cb7c5fd12bc2a7dde
+Cache-Control: no-store
+
+{"dependencies":{"postgres":"ready","redis":"ready"},"instance_id":"app-01","service":"barq-api","status":"ready","version":"2.0.0"}
+p://127.0.0.1:8080/ready
+
+
+- Related Commit:
+181a35b  fix: correct database and redis connection URLs
+
+- Remaining Uncertainty:
+The application dependency configuration is corrected and PostgreSQL/Redis connectivity has been independently verified. Final readiness status was confirmed through the /ready endpoint.
