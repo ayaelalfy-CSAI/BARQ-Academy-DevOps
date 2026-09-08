@@ -217,3 +217,49 @@ redis      redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa3
 
 - Remaining uncertainty:
   `APP_HOST` is currently configured as `127.0.0.1`. Whether this prevents NGINX from reaching the application over the Docker network still needs to be tested separately.
+
+
+## 6 / 2026-09-08 / 17:00
+
+- Symptom:
+  Requests sent to NGINX on port 8080 were reset, and NGINX could resolve app-01 but could not connect to app-01:8080.
+
+- Hypothesis:
+  The application may be listening only on the container loopback interface (127.0.0.1), preventing NGINX from reaching it over the Docker network.
+
+- Command or test:
+  curl -i http://127.0.0.1:8080/health
+  docker exec nginx getent hosts app-01 app-02
+  docker exec nginx wget -qO- http://app-01:8080/health
+
+- Actual output:
+  curl returned:
+  "Recv failure: Connection reset by peer"
+
+  Docker DNS resolved:
+  app-01 -> 192.168.32.2
+  app-02 -> 192.168.32.3
+
+  NGINX-to-app request returned:
+  wget: can't connect to remote host (192.168.32.2): Connection refused
+
+- Failed attempt and what changed your thinking:
+  DNS resolution succeeded, so the issue is not Docker service-name resolution. The connection was refused specifically when accessing port 8080 on app-01, pointing toward the application not listening on the container network interface.
+
+- Root cause:
+  APP_HOST was configured as 127.0.0.1 in docker-compose.yml, causing Flask to listen only on the container loopback interface and preventing NGINX from reaching the application through the Docker network.
+
+- Fix:
+  Changed APP_HOST from 127.0.0.1 to 0.0.0.0 so the Flask application can accept connections through the container network interface.
+
+- Retest evidence:
+  After applying the fix, the NGINX-to-app request succeeded:
+  docker exec nginx wget -qO- http://app-01:8080/health
+  Output:
+  {"instance_id":"app-01","service":"barq-api","status":"alive","version":"2.0.0"}
+
+- Related commit:
+  8855ec7     fix: barq-api listen on all interfaces APP_HOST: 0.0.0.0
+
+- Remaining uncertainty:
+  Need to confirm whether Flask is bound to 127.0.0.1:8080 inside the application containers.
