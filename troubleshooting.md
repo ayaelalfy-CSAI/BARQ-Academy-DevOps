@@ -395,9 +395,22 @@ Expected mapping:
 127.0.0.1:8080->80/tcp
 
 
-Tested the public endpoint:
+- Tested the public endpoint:
 
 curl -i http://127.0.0.1:8080/health
+aya-elalfy@aya-elalfy-2004:~$ curl -i http://127.0.0.1:8080/health
+HTTP/1.1 200 OK
+Server: nginx/1.28.3
+Date: Tue, 08 Sep 2026 16:00:36 GMT
+Content-Type: application/json
+Content-Length: 81
+Connection: keep-alive
+X-Instance-ID: app-01
+X-Request-ID: f8ea1d7881e707925ed300670a933c72
+Cache-Control: no-store
+
+{"instance_id":"app-01","service":"barq-api","status":"alive","version":"2.0.0"}
+
 
 
 - Related Commit:
