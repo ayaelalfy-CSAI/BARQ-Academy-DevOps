@@ -499,7 +499,7 @@ done
 The instance ID configuration will be corrected by this change. The final load-balancing behavior should be confirmed through repeated requests to the NGINX public endpoint.
 
 
-## 10 / 2026-09-08
+## 10 / 2026-09-08  / 20:10
 
 - Symptom:
 The `/ready` endpoint returned HTTP 503 and reported PostgreSQL and Redis as unavailable:
