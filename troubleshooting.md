@@ -419,3 +419,81 @@ Cache-Control: no-store
 - Remaining Uncertainty:
 The public `/health` endpoint must be confirmed with the actual `curl` response. Load balancing between `app-01` and `app-02` should also be verified separately.
 
+
+## 9 / 2026-09-08 / 19:XX
+
+- Symptom:
+The public NGINX endpoint was working successfully, but repeated requests to the `/instance` endpoint returned `app-01` for every request.
+
+Test:
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s http://127.0.0.1:8080/instance
+  echo
+done
+
+
+Actual result:
+{"instance_id":"app-01","service":"barq-api","status":"ok","version":"2.0.0"}
+
+
+The same `app-01` instance ID was returned for all 10 requests.
+
+- Hypothesis:
+The NGINX load balancing configuration may not be distributing requests correctly, or `app-02` may be incorrectly configured with the same instance ID as `app-01`.
+
+- Investigation:
+
+An initial attempt was made to test the application directly using  docker exec app-01 python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/instance', timeout=2).read().decode())"
+{"instance_id":"app-01","service":"barq-api","status":"ok","version":"2.0.0"}
+
+docker exec app-02 python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/instance', timeout=2).read().decode())"
+{"instance_id":"app-01","service":"barq-api","status":"ok","version":"2.0.0"}
+
+
+
+- Failed Attempt / Changed Thinking:
+The results showed that the problem was not application connectivity or NGINX reachability. Instead, `app-02` itself was reporting the same instance ID as `app-01`.
+
+- Root Cause:
+The `docker-compose.yml` configuration for `app-02` incorrectly sets:
+INSTANCE_ID: "app-01"
+
+
+- Fix:
+Change the `app-02` configuration from:
+app-02:
+  environment:
+    <<: *app-env
+    INSTANCE_ID: "app-02"
+
+
+
+- Retest:
+
+Test `app-01` directly:
+docker exec app-01 python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/instance', timeout=2).read().decode())"
+{"instance_id":"app-01","service":"barq-api","status":"ok","version":"2.0.0"}
+
+
+Test `app-02` directly:
+docker exec app-02 python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8080/instance', timeout=2).read().decode())"
+{"instance_id":"app-02","service":"barq-api","status":"ok","version":"2.0.0"}
+
+
+Then verify load balancing through NGINX:
+
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  curl -s http://127.0.0.1:8080/instance
+  echo
+done
+
+{"instance_id":"app-01","service":"barq-api","status":"ok","version":"2.0.0"}
+{"instance_id":"app-02","service":"barq-api","status":"ok","version":"2.0.0"}
+
+
+
+- Related Commit:
+466d8b5   fix : edit the INSTANCE_ID that the app-02 used
+
+- Remaining Uncertainty:
+The instance ID configuration will be corrected by this change. The final load-balancing behavior should be confirmed through repeated requests to the NGINX public endpoint.
