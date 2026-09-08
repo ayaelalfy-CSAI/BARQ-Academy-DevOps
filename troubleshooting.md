@@ -420,7 +420,7 @@ Cache-Control: no-store
 The public `/health` endpoint must be confirmed with the actual `curl` response. Load balancing between `app-01` and `app-02` should also be verified separately.
 
 
-## 9 / 2026-09-08 / 19:XX
+## 9 / 2026-09-08 / 19:45
 
 - Symptom:
 The public NGINX endpoint was working successfully, but repeated requests to the `/instance` endpoint returned `app-01` for every request.
