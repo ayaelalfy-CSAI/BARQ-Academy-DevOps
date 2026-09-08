@@ -332,3 +332,77 @@ server app-02:8080 max_fails=0;
 
 - Remaining Uncertainty:
 The NGINX upstream configuration is now correct. The public endpoint still requires separate verification because the host-to-NGINX port mapping is a separate configuration issue
+
+
+## 8 / 2026-09-08 / 18:45
+
+- Symptom:
+The application containers were healthy and NGINX could reach both application containers directly, but accessing the application through the public host endpoint failed:
+
+curl -i http://127.0.0.1:8080/health
+Result:
+curl: (56) Recv failure: Connection reset by peer
+
+
+- Hypothesis:
+
+The Docker Compose host-to-container port mapping may not match the port on which NGINX is listening.
+
+- Investigation:
+
+Checked the NGINX listening port:
+docker exec nginx nginx -T | grep "listen"
+
+Actual configuration:
+nginx
+listen 80;
+
+
+Checked the Docker Compose port mapping:
+yaml
+ports:
+  - "127.0.0.1:${PUBLIC_PORT:-8080}:81"
+
+
+This mapping means:
+Host port 8080 → NGINX container port 81
+while NGINX was listening on:
+NGINX container port 80
+
+
+Therefore, the host request was being forwarded to port `81`, where NGINX was not listening.
+
+- Root Cause:
+The Docker Compose port mapping exposed container port `81`, but NGINX was configured to listen on container port `80`.
+
+- Fix:
+Changed the Docker Compose port mapping :
+yaml
+ports:
+  - "127.0.0.1:${PUBLIC_PORT:-8080}:80"
+
+
+- Retest:
+Recreated/updated the Compose services:
+bash
+docker compose -p barq-assessment up -d
+
+
+- Verified the port mapping:
+
+docker compose -p barq-assessment ps -a
+Expected mapping:
+127.0.0.1:8080->80/tcp
+
+
+Tested the public endpoint:
+
+curl -i http://127.0.0.1:8080/health
+
+
+- Related Commit:
+4dff13b  fix : port that the nginx is isten on it
+
+- Remaining Uncertainty:
+The public `/health` endpoint must be confirmed with the actual `curl` response. Load balancing between `app-01` and `app-02` should also be verified separately.
+
