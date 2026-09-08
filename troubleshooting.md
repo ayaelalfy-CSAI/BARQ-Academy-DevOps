@@ -263,3 +263,5 @@ redis      redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa3
 
 - Remaining uncertainty:
   Need to confirm whether Flask is bound to 127.0.0.1:8080 inside the application containers.
+
+  
