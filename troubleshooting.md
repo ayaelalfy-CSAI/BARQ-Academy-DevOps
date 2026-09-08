@@ -264,4 +264,71 @@ redis      redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa3
 - Remaining uncertainty:
   Need to confirm whether Flask is bound to 127.0.0.1:8080 inside the application containers.
 
-  
+
+## 7 / 2026-09-08 / 18:37
+
+- Symptom:
+NGINX could reach app-02, but the configured app-01 upstream was not reachable.
+
+- Hypothesis:
+The NGINX upstream configuration may contain an incorrect port for app-01.
+
+- Investigation
+Tested the configured app-01 port:
+
+docker exec nginx wget -qO- http://app-01:8081/health
+
+Result:
+curl: (56) Recv failure: Connection reset by peer
+
+Tested app-02:
+docker exec nginx wget -qO- http://app-02:8080/health
+
+Result: successful health response.
+
+Tested app-01 on port 8080:
+docker exec nginx wget -qO- http://app-01:8080/health
+Result: successful health response.
+
+The NGINX upstream configuration was then inspected:
+
+docker exec nginx nginx -T | grep "server app"
+Actual Configuration
+The configuration contained:
+upstream application_pool {
+    server app-01:8081 max_fails=0;
+    server app-02:8080 max_fails=0;
+}
+
+- Root Cause:
+app-01 was configured to use port 8081, while the BARQ API listens on port 8080.
+
+- Fix:
+
+Changed the NGINX upstream configuration to:
+upstream application_pool {
+    server app-01:8080 max_fails=0;
+    server app-02:8080 max_fails=0;
+}
+
+- Retest:
+Validated the NGINX configuration:
+
+docker exec nginx nginx -t
+
+Result:
+syntax is ok
+test is successful
+
+Verified the upstream configuration:
+docker exec nginx nginx -T | grep "server app"
+
+Actual result:
+server app-01:8080 max_fails=0;
+server app-02:8080 max_fails=0;
+
+- Related Commit:
+7101e22 fix: correct app-01 upstream port from 8081 to 8080
+
+- Remaining Uncertainty:
+The NGINX upstream configuration is now correct. The public endpoint still requires separate verification because the host-to-NGINX port mapping is a separate configuration issue
