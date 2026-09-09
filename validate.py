@@ -73,10 +73,6 @@ def wait_for_endpoint(path):
     return status, body
 
 
-# ============================================================
-# 1. PUBLIC ACCESS
-# ============================================================
-
 def check_public_access():
     status, body = wait_for_endpoint("/health")
 
@@ -90,9 +86,6 @@ def check_public_access():
     return False
 
 
-# ============================================================
-# 2. APPLICATION ENDPOINTS
-# ============================================================
 
 def check_application_endpoints():
     success = True
@@ -218,10 +211,6 @@ def check_application_endpoints():
     return success
 
 
-# ============================================================
-# 3. BOTH BACKEND INSTANCES
-# ============================================================
-
 def check_both_backends():
     instances = set()
 
@@ -274,10 +263,6 @@ def check_both_backends():
         and "app-02" in instances
     )
 
-
-# ============================================================
-# 4. DOCKER CONTAINERS
-# ============================================================
 
 def docker_inspect(container, format_string):
     try:
@@ -353,9 +338,6 @@ def check_containers():
     return success
 
 
-# ============================================================
-# 5. HOST PORT ISOLATION
-# ============================================================
 
 def get_ports(container):
     try:
@@ -424,10 +406,6 @@ def check_host_ports():
 
     return success
 
-
-# ============================================================
-# 6. NETWORK ISOLATION
-# ============================================================
 
 def get_networks(container):
     try:
@@ -557,10 +535,6 @@ def check_network_isolation():
 
     return success
 
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
 
