@@ -14,7 +14,7 @@ x-app: &app
     timeout: 3s
     retries: 3
     start_period: 3s
-  networks: [frontend, backend]
+  networks: [barq-assessment_frontend, barq-assessment_backend]
 services:
   postgres:
     image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
@@ -34,7 +34,7 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
-    networks: [backend]
+    networks: [barq-assessment_backend]
   redis:
     image: redis:7.4-alpine@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     container_name: redis
@@ -49,7 +49,7 @@ services:
       interval: 3s
       timeout: 2s
       retries: 5
-    networks: [backend]
+    networks: [barq-assessment_backend]
   app-01:
     <<: *app
     container_name: app-01
@@ -76,10 +76,10 @@ services:
     volumes: ["./nginx/nginx.conf:/etc/nginx/nginx.conf:ro"]
     depends_on: [app-01, app-02]
     networks: 
-      - frontend
+      - barq-assessment_frontend
 networks:
-  frontend:
-  backend:
+  barq-assessment_frontend:
+  barq-assessment_backend:
     internal: true
 volumes:
   postgres-data:
