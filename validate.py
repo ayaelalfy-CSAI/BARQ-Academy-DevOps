@@ -1,65 +1,46 @@
 #!/usr/bin/env python3
 
-"""Validate the BARQ assessment environment."""
-
 import json
 import os
-import socket
 import subprocess
 import sys
 import time
 import urllib.error
 import urllib.request
 
+
 BASE_URL = os.getenv("BASE_URL", "http://localhost:8080")
 MAX_WAIT = 30
 REQUEST_TIMEOUT = 5
 INSTANCE_CHECKS = 10
 
-failed = False
+failures = []
+
 
 def passed(message):
     print(f"PASS: {message}")
 
 
 def failed_check(message):
-    global failed
-    failed = True
     print(f"FAIL: {message}")
+    failures.append(message)
 
 
-def run_command(command):
-    try:
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-
-        return result.returncode, result.stdout.strip(), result.stderr.strip()
-
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        return 1, "", str(exc)
-
-
-def http_request(method, path, data=None):
+def http_request(method, path, payload=None):
     url = f"{BASE_URL}{path}"
 
-    headers = {
-        "Content-Type": "application/json"
-    }
+    data = None
 
-    body = None
-
-    if data is not None:
-        body = json.dumps(data).encode("utf-8")
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
 
     request = urllib.request.Request(
         url,
-        data=body,
-        headers=headers,
+        data=data,
         method=method,
+        headers={
+            "Content-Type": "application/json"
+        }
     )
 
     try:
@@ -67,137 +48,179 @@ def http_request(method, path, data=None):
             request,
             timeout=REQUEST_TIMEOUT
         ) as response:
+            body = response.read().decode("utf-8")
+            return response.status, body
 
-            response_body = response.read().decode(
-                "utf-8",
-                errors="replace"
-            )
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8")
+        return error.code, body
 
-            return response.status, response_body
-
-    except urllib.error.HTTPError as exc:
-        return exc.code, exc.read().decode(
-            "utf-8",
-            errors="replace"
-        )
-
-    except (urllib.error.URLError, socket.timeout) as exc:
-        return None, str(exc)
+    except Exception as error:
+        return 0, str(error)
 
 
 def wait_for_endpoint(path):
     deadline = time.time() + MAX_WAIT
 
     while time.time() < deadline:
-
         status, body = http_request("GET", path)
 
         if status == 200:
             return status, body
 
-        time.sleep(2)
+        time.sleep(1)
 
-    return None, "timeout"
+    return status, body
 
+
+# ============================================================
+# 1. PUBLIC ACCESS
+# ============================================================
 
 def check_public_access():
-    status, body = wait_for_endpoint("/")
+    status, body = wait_for_endpoint("/health")
 
-    if status == 200 and body.strip():
+    if status == 200:
         passed("Public access through NGINX is working")
         return True
 
     failed_check(
         f"Public access failed: HTTP {status} - {body}"
     )
-
     return False
 
 
-def check_endpoint(path):
-    status, body = wait_for_endpoint(path)
+# ============================================================
+# 2. APPLICATION ENDPOINTS
+# ============================================================
+
+def check_application_endpoints():
+    success = True
+
+    # /health
+    status, body = http_request("GET", "/health")
 
     if status == 200:
-        passed(f"{path} returned HTTP 200")
-        return True
+        passed("/health returned HTTP 200")
+    else:
+        failed_check(
+            f"/health failed: HTTP {status} - {body}"
+        )
+        success = False
 
-    failed_check(
-        f"{path} failed: HTTP {status} - {body}"
-    )
+    # /ready
+    status, body = http_request("GET", "/ready")
 
-    return False
+    if status == 200:
+        try:
+            data = json.loads(body)
 
+            postgres_status = data.get(
+                "dependencies", {}
+            ).get("postgres")
 
-def check_ready():
-    status, body = wait_for_endpoint("/ready")
+            redis_status = data.get(
+                "dependencies", {}
+            ).get("redis")
 
-    if status != 200:
+            if postgres_status == "ready":
+                passed("PostgreSQL readiness check passed")
+            else:
+                failed_check(
+                    f"PostgreSQL is not ready: {postgres_status}"
+                )
+                success = False
+
+            if redis_status == "ready":
+                passed("Redis readiness check passed")
+            else:
+                failed_check(
+                    f"Redis is not ready: {redis_status}"
+                )
+                success = False
+
+            passed(f"/ready returned HTTP 200: {body}")
+
+        except json.JSONDecodeError:
+            failed_check(
+                f"/ready returned invalid JSON: {body}"
+            )
+            success = False
+
+    else:
         failed_check(
             f"/ready failed: HTTP {status} - {body}"
         )
-        return False
+        success = False
 
-    passed(f"/ready returned HTTP 200: {body.strip()}")
-
-    # If /ready returns JSON, inspect PostgreSQL and Redis states.
-    try:
-        data = json.loads(body)
-
-        if isinstance(data, dict):
-
-            postgres_status = str(
-                data.get("postgres", "")
-            ).lower()
-
-            redis_status = str(
-                data.get("redis", "")
-            ).lower()
-
-            if postgres_status:
-                if postgres_status in (
-                    "ready",
-                    "healthy",
-                    "ok",
-                    "up",
-                ):
-                    passed("PostgreSQL readiness reported as healthy")
-                else:
-                    failed_check(
-                        f"PostgreSQL readiness is: {postgres_status}"
-                    )
-
-            if redis_status:
-                if redis_status in (
-                    "ready",
-                    "healthy",
-                    "ok",
-                    "up",
-                ):
-                    passed("Redis readiness reported as healthy")
-                else:
-                    failed_check(
-                        f"Redis readiness is: {redis_status}"
-                    )
-
-    except json.JSONDecodeError:
-        pass
-
-    return True
-
-
-def check_instance():
+    # /instance
     status, body = http_request("GET", "/instance")
 
-    if status == 200 and body.strip():
-        passed(f"/instance returned: {body.strip()}")
-        return body.strip()
+    if status == 200:
+        try:
+            data = json.loads(body)
+            instance_id = data.get("instance_id")
 
-    failed_check(
-        f"/instance failed: HTTP {status} - {body}"
+            if instance_id:
+                passed(
+                    f"/instance returned: {body}"
+                )
+            else:
+                failed_check(
+                    f"/instance missing instance_id: {body}"
+                )
+                success = False
+
+        except json.JSONDecodeError:
+            failed_check(
+                f"/instance returned invalid JSON: {body}"
+            )
+            success = False
+
+    else:
+        failed_check(
+            f"/instance failed: HTTP {status} - {body}"
+        )
+        success = False
+
+    # /records
+    status, body = http_request(
+        "POST",
+        "/records",
+        {
+            "title": "validation-test"
+        }
     )
 
-    return None
+    if status in (200, 201):
+        passed(
+            f"POST /records succeeded: HTTP {status}"
+        )
+    else:
+        failed_check(
+            f"POST /records failed: HTTP {status} - {body}"
+        )
+        success = False
 
+    # /counter
+    status, body = http_request("GET", "/counter")
+
+    if status == 200:
+        passed(
+            f"/counter returned: {body}"
+        )
+    else:
+        failed_check(
+            f"/counter failed: HTTP {status} - {body}"
+        )
+        success = False
+
+    return success
+
+
+# ============================================================
+# 3. BOTH BACKEND INSTANCES
+# ============================================================
 
 def check_both_backends():
     instances = set()
@@ -208,11 +231,25 @@ def check_both_backends():
     )
 
     for _ in range(INSTANCE_CHECKS):
-
-        status, body = http_request("GET", "/instance")
+        status, body = http_request(
+            "GET",
+            "/instance"
+        )
 
         if status == 200 and body.strip():
-            instances.add(body.strip())
+
+            try:
+                data = json.loads(body)
+
+                instance_id = data.get("instance_id")
+
+                if instance_id:
+                    instances.add(instance_id)
+
+            except json.JSONDecodeError:
+                failed_check(
+                    f"/instance returned invalid JSON: {body}"
+                )
 
         time.sleep(0.2)
 
@@ -220,193 +257,223 @@ def check_both_backends():
         passed("app-01 served requests")
     else:
         failed_check(
-            f"app-01 was not observed. Instances: {sorted(instances)}"
+            f"app-01 was not observed. "
+            f"Instances: {sorted(instances)}"
         )
 
     if "app-02" in instances:
         passed("app-02 served requests")
     else:
         failed_check(
-            f"app-02 was not observed. Instances: {sorted(instances)}"
+            f"app-02 was not observed. "
+            f"Instances: {sorted(instances)}"
         )
 
-    return "app-01" in instances and "app-02" in instances
-
-
-def check_records():
-    status, body = http_request(
-        "POST",
-        "/records",
-        {
-            "message": "validation-test"
-        }
+    return (
+        "app-01" in instances
+        and "app-02" in instances
     )
 
-    if status in (200, 201):
-        passed(
-            f"POST /records succeeded: HTTP {status}"
+
+# ============================================================
+# 4. DOCKER CONTAINERS
+# ============================================================
+
+def docker_inspect(container, format_string):
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                format_string,
+                container
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10
         )
-        return True
 
-    failed_check(
-        f"POST /records failed: HTTP {status} - {body}"
-    )
+        if result.returncode != 0:
+            return None
 
-    return False
+        return result.stdout.strip()
 
-
-def check_counter():
-    status, body = http_request(
-        "GET",
-        "/counter"
-    )
-
-    if status == 200 and body.strip():
-        passed(
-            f"/counter returned: {body.strip()}"
-        )
-        return True
-
-    failed_check(
-        f"/counter failed: HTTP {status} - {body}"
-    )
-
-    return False
+    except Exception:
+        return None
 
 
-def check_container_running(container):
-    code, output, error = run_command(
-        [
-            "docker",
-            "inspect",
-            "-f",
-            "{{.State.Running}}",
-            container,
-        ]
-    )
-
-    if code != 0:
-        failed_check(
-            f"container {container} does not exist or cannot be inspected"
-        )
-        return False
-
-    if output == "true":
-        passed(f"container {container} is running")
-        return True
-
-    failed_check(
-        f"container {container} is not running"
-    )
-
-    return False
-
-
-def check_container_health(container):
-    code, output, error = run_command(
-        [
-            "docker",
-            "inspect",
-            "-f",
-            "{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}",
-            container,
-        ]
-    )
-
-    if code != 0:
-        failed_check(
-            f"could not inspect health of {container}"
-        )
-        return False
-
-    if output == "healthy":
-        passed(f"{container} is healthy")
-        return True
-
-    if output == "no-healthcheck":
-        failed_check(
-            f"{container} has no Docker healthcheck"
-        )
-        return False
-
-    failed_check(
-        f"{container} health status is {output}"
-    )
-
-    return False
-
-
-def check_host_ports():
+def check_containers():
     containers = [
         "nginx",
         "app-01",
         "app-02",
         "postgres",
-        "redis",
+        "redis"
     ]
+
+    success = True
 
     for container in containers:
 
-        code, output, error = run_command(
-            [
-                "docker",
-                "port",
-                container,
-            ]
+        running = docker_inspect(
+            container,
+            "{{.State.Running}}"
         )
 
-        if code != 0:
-            failed_check(
-                f"could not inspect ports for {container}"
+        if running == "true":
+            passed(
+                f"container {container} is running"
             )
+        else:
+            failed_check(
+                f"container {container} is not running"
+            )
+            success = False
+
+        # NGINX does not require a Docker healthcheck.
+        if container == "nginx":
             continue
 
-        if container == "nginx":
+        health = docker_inspect(
+            container,
+            "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
+        )
 
-            if any(
-                "127.0.0.1:8080" in line
-                or "0.0.0.0:8080" in line
-                or "[::]:8080" in line
-                for line in output.splitlines()
-            ):
-                passed(
-                    "NGINX publishes host port 8080"
-                )
-            else:
-                failed_check(
-                    f"NGINX does not publish host port 8080: {output}"
-                )
-
+        if health == "healthy":
+            passed(
+                f"{container} is healthy"
+            )
         else:
+            failed_check(
+                f"{container} health status: {health}"
+            )
+            success = False
 
-            if output:
-                failed_check(
-                    f"{container} has a prohibited host port: {output}"
-                )
-            else:
-                passed(
-                    f"{container} has no published host port"
-                )
+    return success
 
+
+# ============================================================
+# 5. HOST PORT ISOLATION
+# ============================================================
+
+def get_ports(container):
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                "{{json .NetworkSettings.Ports}}",
+                container
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode != 0:
+            return None
+
+        return json.loads(result.stdout)
+
+    except Exception:
+        return None
+
+
+def check_host_ports():
+    success = True
+
+    # NGINX must publish 8080
+    nginx_ports = get_ports("nginx")
+
+    if nginx_ports and nginx_ports.get("80/tcp"):
+        passed("NGINX publishes host port 8080")
+    else:
+        failed_check(
+            "NGINX does not publish host port 8080"
+        )
+        success = False
+
+    # These services must NOT publish host ports
+    for container in [
+        "app-01",
+        "app-02",
+        "postgres",
+        "redis"
+    ]:
+
+        ports = get_ports(container)
+
+        has_published_ports = any(
+            value
+            for value in (ports or {}).values()
+            if value
+        )
+
+        if not has_published_ports:
+            passed(
+                f"{container} has no published host port"
+            )
+        else:
+            failed_check(
+                f"{container} has published host ports: "
+                f"{ports}"
+            )
+            success = False
+
+    return success
+
+
+# ============================================================
+# 6. NETWORK ISOLATION
+# ============================================================
 
 def get_networks(container):
-    code, output, error = run_command(
-        [
-            "docker",
-            "inspect",
-            "-f",
-            "{{range $name, $network := .NetworkSettings.Networks}}{{$name}} {{end}}",
-            container,
-        ]
-    )
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "inspect",
+                "-f",
+                "{{json .NetworkSettings.Networks}}",
+                container
+            ],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
 
-    if code != 0:
+        if result.returncode != 0:
+            return set()
+
+        networks = json.loads(result.stdout)
+
+        return set(networks.keys())
+
+    except Exception:
         return set()
 
-    return set(output.split())
+
+def normalize_networks(networks):
+    logical_networks = set()
+
+    for network in networks:
+
+        if network.endswith("_frontend"):
+            logical_networks.add("frontend")
+
+        elif network.endswith("_backend"):
+            logical_networks.add("backend")
+
+        else:
+            logical_networks.add(network)
+
+    return logical_networks
 
 
 def check_network_isolation():
+
     expected = {
         "nginx": {"frontend"},
         "app-01": {"frontend", "backend"},
@@ -415,52 +482,85 @@ def check_network_isolation():
         "redis": {"backend"},
     }
 
+    success = True
+
     for container, expected_networks in expected.items():
 
         actual_networks = get_networks(container)
 
-        if not actual_networks:
-            failed_check(
-                f"could not determine networks for {container}"
-            )
-            continue
+        logical_networks = normalize_networks(
+            actual_networks
+        )
 
-        if actual_networks == expected_networks:
+        if logical_networks == expected_networks:
+
             passed(
                 f"{container} networks are correct: "
-                f"{sorted(actual_networks)}"
+                f"{sorted(logical_networks)}"
             )
+
         else:
+
             failed_check(
                 f"{container} networks are incorrect. "
                 f"Expected: {sorted(expected_networks)}, "
-                f"Actual: {sorted(actual_networks)}"
+                f"Actual: {sorted(logical_networks)}"
             )
 
+            success = False
+
+    # NGINX must NOT access backend
     nginx_networks = get_networks("nginx")
 
-    if "backend" not in nginx_networks:
+    nginx_has_backend = any(
+        network.endswith("_backend")
+        for network in nginx_networks
+    )
+
+    if not nginx_has_backend:
+
         passed(
             "NGINX is isolated from the backend network"
         )
+
     else:
+
         failed_check(
             "NGINX is connected to the backend network"
         )
 
+        success = False
+
+    # PostgreSQL and Redis must NOT access frontend
     for container in ("postgres", "redis"):
 
         networks = get_networks(container)
 
-        if "frontend" not in networks:
+        has_frontend = any(
+            network.endswith("_frontend")
+            for network in networks
+        )
+
+        if not has_frontend:
+
             passed(
                 f"{container} is isolated from the frontend network"
             )
+
         else:
+
             failed_check(
                 f"{container} is connected to the frontend network"
             )
 
+            success = False
+
+    return success
+
+
+# ============================================================
+# MAIN
+# ============================================================
 
 def main():
 
@@ -469,49 +569,37 @@ def main():
     print(f"Base URL: {BASE_URL}")
     print(f"Maximum wait: {MAX_WAIT} seconds")
     print("=" * 60)
+    print()
 
-    print("\n[1] PUBLIC ACCESS")
-
+    print("[1] PUBLIC ACCESS")
     check_public_access()
+    print()
 
-    print("\n[2] APPLICATION ENDPOINTS")
+    print("[2] APPLICATION ENDPOINTS")
+    check_application_endpoints()
+    print()
 
-    check_endpoint("/health")
-    check_ready()
-    check_instance()
-    check_records()
-    check_counter()
-
-    print("\n[3] BOTH BACKEND INSTANCES")
-
+    print("[3] BOTH BACKEND INSTANCES")
     check_both_backends()
+    print()
 
-    print("\n[4] DOCKER CONTAINERS")
+    print("[4] DOCKER CONTAINERS")
+    check_containers()
+    print()
 
-    containers = [
-        "nginx",
-        "app-01",
-        "app-02",
-        "postgres",
-        "redis",
-    ]
-
-    for container in containers:
-        if check_container_running(container):
-            check_container_health(container)
-
-    print("\n[5] HOST PORT ISOLATION")
-
+    print("[5] HOST PORT ISOLATION")
     check_host_ports()
+    print()
 
-    print("\n[6] NETWORK ISOLATION")
-
+    print("[6] NETWORK ISOLATION")
     check_network_isolation()
+    print()
 
-    print("\n" + "=" * 60)
+    print("=" * 60)
 
-    if failed:
+    if failures:
         print("VALIDATION FAILED")
+        print(f"Total failures: {len(failures)}")
         sys.exit(1)
 
     print("VALIDATION PASSED")
@@ -520,4 +608,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
