@@ -6,7 +6,8 @@ Use all three supplied logs. Answer every question with commands/scripts and act
 
 - `in the application.log and the access.log files: ` 
 
-`script for UTC interval` :         
+`script for UTC interval` :  
+```bash       
 python3 -c "
 import json                                         
 for f in ['logs/access.log','logs/application.log']:
@@ -18,6 +19,7 @@ for f in ['logs/access.log','logs/application.log']:
             except: pass
     print(f, 'from', min(times), 'to', max(times))
 "
+```
 
 `Answer`:
 logs/access.log from 2026-08-20T11:00:00.015Z to 2026-08-20T11:29:57.578Z
@@ -25,6 +27,7 @@ logs/application.log from 2026-08-20T11:00:00.015Z to 2026-08-20T11:29:57.578Z
 
 
 `script for valid,mailformed and duplicated` :  
+```bash
 python3 -c "
 import json
 for f in ['logs/access.log','logs/application.log']:
@@ -39,6 +42,8 @@ for f in ['logs/access.log','logs/application.log']:
     valid = total - malformed
     print(f, 'total:', total, 'valid:', valid, 'malformed:', malformed)
 "
+```
+`Answer`:
 logs/access.log total: 726 valid: 725 malformed: 1
 logs/application.log total: 730 valid: 729 malformed: 1
 
@@ -46,6 +51,7 @@ logs/application.log total: 730 valid: 729 malformed: 1
 - `in the error.log file:`
 
 `script` :
+```bash
 head -1 logs/error.log | grep -oP '^\S+ \S+'
 tail -2 logs/error.log | head -1 | grep -oP '^\S+ \S+'
 
@@ -62,7 +68,7 @@ with open('logs/error.log') as fh:
             malformed += 1
 print('total:', total, 'valid:', valid, 'malformed:', malformed)
 "
-
+```
 `Answer`:
 2026/08/20 11:05:02
 2026/08/20 11:26:47
@@ -73,6 +79,7 @@ total: 68 valid: 68 malformed: 0
 ## 2. How many distinct client requests occurred? How did you deduplicate and avoid counting retries twice?
 
 `script`
+```bash
 python3 -c "
 import json
 ids=set()
@@ -83,7 +90,7 @@ with open('logs/access.log') as fh:
         except: pass
 print('distinct request_id count:', len(ids))
 "
-
+```
 `Answer`
 distinct request_id count: 720
 
@@ -96,6 +103,7 @@ This means that each unique `request_id` represents one distinct client request,
 ## 3. What are the final client status counts and error rate? State your denominator.
 
 `script`
+```bash
 python3 -c "
 import json
 from collections import Counter
@@ -112,7 +120,7 @@ print(c)
 errors=sum(v for k,v in c.items() if k>=400)
 print('error rate:', errors, '/', n, '=', round(errors/n*100,2), '%')
 "
-
+```
 `Answer`
 Counter({200: 620, 503: 47, 502: 40, 404: 10, 504: 8})
 error rate: 105 / 725 = 14.48 %
@@ -121,6 +129,7 @@ error rate: 105 / 725 = 14.48 %
 ## 4. Which paths, time windows and backends account for the failures?
 
 `script`
+```bash
 python3 -c "
 import json
 from collections import Counter
@@ -136,7 +145,7 @@ with open('logs/access.log') as fh:
 print('by path:', by_path)
 print('by backend:', by_backend)
 "
-
+```
 
 `Answer`
 by path: Counter({'/records': 26, '/counter': 26, '/ready': 23, '/missing': 10, '/health': 10, '/': 10})
@@ -146,6 +155,7 @@ by backend: Counter({'172.23.0.12:8080': 73, '172.23.0.11:8080': 32})
 ## 5. What are the median and p95 client latencies? State the percentile method and units.
 
 `script`
+```bash
 python3 -c "
 import json
 import numpy as np
@@ -185,6 +195,7 @@ else:
     print('Percentile method: linear interpolation')
     print('Units: seconds')
 "
+```
 
 `Answer`
 
@@ -198,6 +209,7 @@ Units: seconds
 ## 6. Which requests retried upstream? How many succeeded after retrying?
 
 `script`
+```bash
 python3 -c "
 import json
 retried=0; succeeded=0             
@@ -211,6 +223,7 @@ with open('logs/access.log') as fh:
         except: pass                               
 print('retried:', retried, 'succeeded after retry:', succeeded)
 "
+```
 
 `Answer`
 retried: 19 succeeded after retry: 19
@@ -219,6 +232,7 @@ retried: 19 succeeded after retry: 19
 ## 7. Build an incident timeline using evidence from access, error AND application logs. 
 
 `script for access.log`
+```bash
 python3 -c "
 import json
 
@@ -240,16 +254,21 @@ with open('logs/access.log') as fh:
         except (json.JSONDecodeError, KeyError):
             pass
 "
-
+```
 `Answer`
 
 `I will use it as an example`
 {"timestamp":"2026-08-20T11:05:12.503Z","request_id":"lab-000126","method":"GET","path":"/records","status":502,"upstream":"172.23.0.12:8080","upstream_status":"502","request_time":0.003,"client":"192.0.2.24"}
 
 `and then Ran` 
-- grep 'lab-000126' logs/error.log
+```bash
+ grep 'lab-000126' logs/error.log
+ ```
 2026/08/20 11:05:12 [error] 31#31: *126 connect() failed (111: Connection refused) while connecting to upstream, request_id=lab-000126, request: "GET /records HTTP/1.1", upstream: "http://172.23.0.12:8080/records"
+
+```bash
 - grep 'lab-000126' logs/application.log
+```
 nothing output
 
 `Incident Timeline`
@@ -265,6 +284,7 @@ nothing output
 ## 8. Show one correlated failed request and one successful request. Include IDs and timestamps.
 
 `script for successful request`
+```bash
 python3 -c "
 import json
 
@@ -286,19 +306,24 @@ with open('logs/access.log') as fh:
         except (json.JSONDecodeError, KeyError):
             pass
 "
-
+```
 `select from the response` 
 2026-08-20T11:29:07.558Z | ACCESS | request_id: lab-000700 | path: /ready | status: 200 | upstream_status: 200 | upstream: 172.23.0.12:8080
 
 `and Ran`
-- grep 'lab-000700' logs/application.log
+```bash
+ grep 'lab-000700' logs/application.log
+ ```
 {"timestamp": "2026-08-20T11:29:07.558Z", "level": "INFO", "event": "http_request", "request_id": "lab-000700", "instance_id": "app-02", "method": "GET", "path": "/ready", "status": 200, "duration_ms": 58.0}
 
-- grep 'lab-000700' logs/error.log
+```bash
+ grep 'lab-000700' logs/error.log
+```
 nothing response
 
 
 `script for failed request`
+```bash
 python3 -c "
 import json
 
@@ -317,17 +342,23 @@ with open('logs/access.log') as fh:
                     '| upstream_status:', d.get('upstream_status'),
                     '| upstream:', d.get('upstream')
                 )
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError): "
+
+```
   
 
 `select from response`
 2026-08-20T11:03:17.578Z | ACCESS | request_id: lab-000080 | path: /missing | status: 404 | upstream_status: 404 | upstream: 172.23.0.12:8080
 
 `and Ran`
-- grep 'lab-000080' logs/application.log
+```bash
+ grep 'lab-000080' logs/application.log
+```
 {"timestamp": "2026-08-20T11:03:17.578Z", "level": "WARN", "event": "http_request", "request_id": "lab-000080", "instance_id": "app-02", "method": "GET", "path": "/missing", "status": 404, "duration_ms": 78.0}
 
-- grep 'lab-000080' logs/error.log
+```bash
+ grep 'lab-000080' logs/error.log
+```
 nothing
 
 `this meaning`
@@ -341,13 +372,19 @@ lab-000080 was successfully proxied by NGINX to the Flask application. The Flask
 
 
 `Example`
-- grep 'lab-000126' logs/access.log
+```bash
+ grep 'lab-000126' logs/access.log
+ ```
 {"timestamp":"2026-08-20T11:05:12.503Z","request_id":"lab-000126","method":"GET","path":"/records","status":502,"upstream":"172.23.0.12:8080","upstream_status":"502","request_time":0.003,"client":"192.0.2.24"}
 
-- grep 'lab-000126' logs/application.log
+```bash
+grep 'lab-000126' logs/application.log
+```
 nothing
 
-- grep 'lab-000126' logs/error.log
+```bash
+grep 'lab-000126' logs/error.log
+```
 2026/08/20 11:05:12 [error] 31#31: *126 connect() failed (111: Connection refused) while connecting to upstream, request_id=lab-000126, request: "GET /records HTTP/1.1", upstream: "http://172.23.0.12:8080/records"
 
 
@@ -356,13 +393,19 @@ lab-000080 reached the Flask application successfully, but the application retur
 
 
 `Example `
-- grep 'lab-000080' logs/application.log
+```bash
+grep 'lab-000080' logs/application.log
+```
 {"timestamp": "2026-08-20T11:03:17.578Z", "level": "WARN", "event": "http_request", "request_id": "lab-000080", "instance_id": "app-02", "method": "GET", "path": "/missing", "status": 404, "duration_ms": 78.0}
 
-- grep 'lab-000080' logs/error.log
+```bash
+ grep 'lab-000080' logs/error.log
+```
 nothing
 
-- grep 'lab-000080' logs/access.log
+```bash
+ grep 'lab-000080' logs/access.log
+ ```
 {"timestamp":"2026-08-20T11:03:17.578Z","request_id":"lab-000080","method":"GET","path":"/missing","status":404,"upstream":"172.23.0.12:8080","upstream_status":"404","request_time":0.078,"client":"192.0.2.24"}
 
 
