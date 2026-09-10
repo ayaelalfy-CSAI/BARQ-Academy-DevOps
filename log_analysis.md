@@ -2,7 +2,7 @@
 
 Use all three supplied logs. Answer every question with commands/scripts and actual output.
 
-1. What UTC interval is covered? How many valid, malformed and duplicate lines are in each file?
+## 1. What UTC interval is covered? How many valid, malformed and duplicate lines are in each file?
 
 - `in the application.log and the access.log files: ` 
 
@@ -70,7 +70,7 @@ print('total:', total, 'valid:', valid, 'malformed:', malformed)
 total: 68 valid: 68 malformed: 0
 
 =============================================
-2. How many distinct client requests occurred? How did you deduplicate and avoid counting retries twice?
+## 2. How many distinct client requests occurred? How did you deduplicate and avoid counting retries twice?
 
 `script`
 python3 -c "
@@ -93,7 +93,7 @@ I deduplicated client requests using the `request_id` field from the access log.
 This means that each unique `request_id` represents one distinct client request, while repeated occurrences of the same `request_id` were treated as retries/duplicates and were not counted again.
 
 ==============================================
-3. What are the final client status counts and error rate? State your denominator.
+## 3. What are the final client status counts and error rate? State your denominator.
 
 `script`
 python3 -c "
@@ -118,7 +118,7 @@ Counter({200: 620, 503: 47, 502: 40, 404: 10, 504: 8})
 error rate: 105 / 725 = 14.48 %
 
 =========================================
-4. Which paths, time windows and backends account for the failures?
+## 4. Which paths, time windows and backends account for the failures?
 
 `script`
 python3 -c "
@@ -143,7 +143,7 @@ by path: Counter({'/records': 26, '/counter': 26, '/ready': 23, '/missing': 10, 
 by backend: Counter({'172.23.0.12:8080': 73, '172.23.0.11:8080': 32})
 
 ==========================================
-5. What are the median and p95 client latencies? State the percentile method and units.
+## 5. What are the median and p95 client latencies? State the percentile method and units.
 
 `script`
 python3 -c "
@@ -195,7 +195,7 @@ Percentile method: linear interpolation
 Units: seconds
 
 ============================================
-6. Which requests retried upstream? How many succeeded after retrying?
+## 6. Which requests retried upstream? How many succeeded after retrying?
 
 `script`
 python3 -c "
@@ -216,7 +216,7 @@ print('retried:', retried, 'succeeded after retry:', succeeded)
 retried: 19 succeeded after retry: 19
 
 ============================================
-7. Build an incident timeline using evidence from access, error AND application logs.
+## 7. Build an incident timeline using evidence from access, error AND application logs. 
 
 `script for access.log`
 python3 -c "
@@ -262,7 +262,7 @@ nothing output
   - This indicates that the failure occurred **between the proxy and the upstream backend**, before the request could be processed by the application.
 
 =============================================
-8. Show one correlated failed request and one successful request. Include IDs and timestamps.
+## 8. Show one correlated failed request and one successful request. Include IDs and timestamps.
 
 `script for successful request`
 python3 -c "
@@ -334,7 +334,7 @@ nothing
 lab-000080 was successfully proxied by NGINX to the Flask application. The Flask application returned HTTP 404 because `/missing` was not found. NGINX correctly returned this response to the client
 
 ===========================================
-9. Which errors appear to be proxy/connectivity issues versus dependency/application issues? What proves it?
+## 9. Which errors appear to be proxy/connectivity issues versus dependency/application issues? What proves it?
 
 `Proxy/connectivity issue: `
  lab-000126 returned HTTP 502. The error.log shows that NGINX failed to connect to the upstream 172.23.0.12:8080 with “connection refused.” There is also no matching lab-000126 entry in application.log, proving that the request did not reach the Flask application.
@@ -367,7 +367,7 @@ nothing
 
 
 ===========================================
-10. What do the logs not prove? What would you check next in a running environment?
+## 10. What do the logs not prove? What would you check next in a running environment?
 
 `Answer`
 The logs do not prove the exact root cause of the failures. For example, “connection refused” proves that NGINX could not connect to the upstream at that time, but it does not prove whether the application was down, restarting, not listening on port 8080, or there was a network/service configuration problem.
