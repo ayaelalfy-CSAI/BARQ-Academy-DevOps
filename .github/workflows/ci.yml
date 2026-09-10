@@ -16,8 +16,8 @@ jobs:
       - name: Create .env for CI
         run: |
           cat <<EOF > .env
-          POSTGRES_USER=barq_app
-          POSTGRES_DB=barq_tasks
+          POSTGRES_USER=${{ secrets.CI_POSTGRES_USER }}
+          POSTGRES_DB=${{ secrets.CI_POSTGRES_DB }}
           POSTGRES_PASSWORD=${{ secrets.CI_POSTGRES_PASSWORD }}
           PUBLIC_PORT=8080
           EOF
