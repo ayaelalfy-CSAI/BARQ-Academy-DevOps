@@ -19,3 +19,63 @@ The application consists of:
 
 <img src="/assets/flowReqest.png" alt="flowRequest" width="900">
 
+
+## Prerequisites
+
+Install:
+
+- Git
+- Docker
+- Docker Compose
+- Python 3
+
+Verify:
+
+- git --version
+- docker --version
+- docker compose version
+- python3 --version
+
+
+## Setup
+
+Clone the repository:
+
+- git clone <REPOSITORY_URL>
+- cd barq-academy
+
+Create the environment file:
+
+- cp .env.example .env
+
+Edit .env and provide the required configuration:
+
+- nano .env
+
+Do not commit .env to Git.
+
+Verify:
+
+- git status
+
+The .env file should not appear as a tracked file.
+
+
+## Validate Docker Compose Configuration
+
+Before starting the application:
+
+- docker compose config
+
+This verifies that the Compose configuration is valid and that the required environment variables are available.
+
+
+## Build
+
+Build all application images:
+
+- docker compose build
+
+To rebuild without using the Docker build cache:
+
+- docker compose build --no-cache
