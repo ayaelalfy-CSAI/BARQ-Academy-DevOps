@@ -1,0 +1,92 @@
+name: BARQ CI
+ 
+on:
+  push:
+  pull_request:
+ 
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+ 
+      # 2. Create .env for CI (secrets never live in the repo)
+      - name: Create .env for CI
+        run: |
+          cat <<EOF > .env
+          POSTGRES_USER=barq_app
+          POSTGRES_DB=barq_tasks
+          POSTGRES_PASSWORD=${{ secrets.CI_POSTGRES_PASSWORD }}
+          PUBLIC_PORT=8080
+          EOF
+ 
+      # 3. Syntax and Compose checks
+      - name: Check Python syntax
+        run: |
+          python3 -m py_compile validate.py
+          python3 -m py_compile failure_test.py
+ 
+      - name: Check shell script syntax
+        run: |
+          bash -n backup.sh
+          bash -n restore.sh
+ 
+      - name: Validate Docker Compose syntax
+        run: |
+          docker compose config
+ 
+      # 4. Build
+      - name: Build Docker images
+        run: |
+          docker compose build
+ 
+      # 5. Start
+      - name: Start services
+        run: |
+          docker compose up -d
+ 
+      # 6. Wait for readiness (checks actual health status, not just "running")
+      - name: Wait for services to be healthy
+        run: |
+          services="app-01 app-02 postgres redis nginx"
+          for i in $(seq 1 30); do
+            unhealthy=0
+            for svc in $services; do
+              status=$(docker inspect --format='{{.State.Health.Status}}' "$svc" 2>/dev/null || echo "none")
+              if [ "$status" = "unhealthy" ] || [ "$status" = "starting" ]; then
+                unhealthy=1
+              fi
+              if [ "$status" = "none" ]; then
+                running=$(docker inspect --format='{{.State.Running}}' "$svc" 2>/dev/null || echo "false")
+                if [ "$running" != "true" ]; then
+                  unhealthy=1
+                fi
+              fi
+            done
+            if [ "$unhealthy" -eq 0 ]; then
+              echo "All services healthy"
+              docker compose ps -a
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "ERROR: services did not become healthy in time"
+              docker compose ps -a
+              exit 1
+            fi
+            echo "Waiting for services... attempt $i/30"
+            sleep 2
+          done
+ 
+      # 7. Validate environment (fails CI with non-zero exit if checks fail)
+      - name: Run validation
+        run: |
+          python3 validate.py
+
+     # 10. Cleanup
+      - name: Stop services
+        if: always()
+        run: |
+          docker compose down
+ 
