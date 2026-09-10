@@ -10,15 +10,13 @@ The project includes automated validation, backend failure/recovery testing, dat
 
 The application consists of:
 
-
 - **nginx** — reverse proxy and load balancer
 - **app-01** — Flask application instance
 - **app-02** — Flask application instance
 - **postgres** — PostgreSQL database
 - **redis** — Redis service
 
-<img src="/assets/flowReqest.png" alt="flowRequest" width="900">
-
+<img src="assets/flowReqest.png" alt="Request Flow" width="900">
 
 ## Prerequisites
 
@@ -31,51 +29,64 @@ Install:
 
 Verify:
 
-- git --version
-- docker --version
-- docker compose version
-- python3 --version
-
+```bash
+git --version
+docker --version
+docker compose version
+python3 --version
+```
 
 ## Setup
 
 Clone the repository:
 
-- git clone <REPOSITORY_URL>
-- cd barq-academy
+```bash
+git clone <REPOSITORY_URL>
+cd barq-academy
+```
 
 Create the environment file:
 
-- cp .env.example .env
+```bash
+cp .env.example .env
+```
 
-Edit .env and provide the required configuration:
+Edit `.env` and provide the required configuration:
 
-- nano .env
+```bash
+nano .env
+```
 
-Do not commit .env to Git.
+> **Important:** Do not commit `.env` to Git.
 
 Verify:
 
-- git status
+```bash
+git status
+```
 
-The .env file should not appear as a tracked file.
-
+The `.env` file should not appear as a tracked file.
 
 ## Validate Docker Compose Configuration
 
 Before starting the application:
 
-- docker compose config
+```bash
+docker compose config
+```
 
 This verifies that the Compose configuration is valid and that the required environment variables are available.
-
 
 ## Build
 
 Build all application images:
 
-- docker compose build
+```bash
+docker compose build
+```
 
 To rebuild without using the Docker build cache:
 
-- docker compose build --no-cache
+```bash
+docker compose build --no-cache
+```
