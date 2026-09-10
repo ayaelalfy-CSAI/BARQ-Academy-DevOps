@@ -77,6 +77,12 @@ services:
     depends_on: [app-01, app-02]
     networks: 
       - barq-assessment_frontend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 3s  
 networks:
   barq-assessment_frontend:
   barq-assessment_backend:
