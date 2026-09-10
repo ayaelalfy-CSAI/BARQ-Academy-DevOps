@@ -92,7 +92,7 @@ docker compose build --no-cache
 ```
 
 
-**## Start**
+## Start
 
 Start all services in detached mode:
 
@@ -154,7 +154,7 @@ docker compose logs -f
 
 ```
 
-**## Check Health**
+## Check Health
 
 Check container status:
 
@@ -254,7 +254,7 @@ curl http://localhost:8080/instance
 
 ```
 
-**## Backend Load-Balancing Test**
+## Backend Load-Balancing Test
 
 The validation script checks that both backend instances receive traffic.
 
@@ -284,7 +284,7 @@ The exact distribution is not expected to be perfectly equal because NGINX load 
 
 The important requirement is that **both backends are observed**.
 
-**## Backend Failure and Recovery Test**
+## Backend Failure and Recovery Test
 
 The failure test intentionally stops one backend and verifies that the remaining backend continues serving traffic.
 
@@ -353,7 +353,7 @@ This test demonstrates **backend-level resilience**.
 
 > **Note:** This does not prove complete production high availability because NGINX and PostgreSQL can still be single points of failure.
 
-**## Database Backup**
+## Database Backup
 
 The database backup script is:
 
@@ -389,7 +389,7 @@ ls -lh
 
 ```
 
-**## Database Restore**
+## Database Restore
 
 Make the restore script executable:
 
@@ -437,7 +437,7 @@ docker compose down
 
 The persistent volumes are not removed by the normal `docker compose down` command.
 
-**## Cleanup**
+## Cleanup
 
 To remove containers and networks:
 
@@ -469,7 +469,7 @@ docker system prune
 
 Review the resources before confirming the prune operation.
 
-**## CI**
+## CI (Continuous Intergration)
 
 GitHub Actions is configured to run on:
 
@@ -539,7 +539,7 @@ Secrets are not stored directly in the repository.
 
 The Trivy image scan is currently configured as a **non-blocking security check** for the assessment.
 
-**## Ports and Networks**
+## Ports and Networks
 
 The public entry point is:
 
@@ -563,7 +563,7 @@ The application, PostgreSQL, and Redis services communicate through Docker netwo
 
 This reduces the externally exposed attack surface and prevents direct host access to internal services.
 
-**## Persistence**
+## Persistence
 
 PostgreSQL uses persistent storage so that application data survives normal container recreation.
 
@@ -591,7 +591,7 @@ Therefore, production deployments should additionally use:
 
 - Regular restore testing
 
-**## Troubleshooting**
+## Troubleshooting
 
 Investigation details, failed attempts, root causes, fixes, and retests are documented separately in:
 
