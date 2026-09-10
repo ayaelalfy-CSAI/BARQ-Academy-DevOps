@@ -84,7 +84,15 @@ jobs:
         run: |
           python3 validate.py
 
-          
+        
+      # 8. Extra credit: image/security scan (non-blocking, documented in security_review.md)
+      - name: Security scanning with Trivy 
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'barq-assessment-app-01:latest'
+          format: 'table'
+          exit-code: '0'
+   
 
      # 10. Cleanup
       - name: Stop services
