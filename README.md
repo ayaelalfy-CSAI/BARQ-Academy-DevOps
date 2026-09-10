@@ -549,6 +549,76 @@ Secrets are not stored directly in the repository.
 The Trivy image scan is currently configured as a **non-blocking security check** for the assessment.
 
 
+## Validation and Design Rationale
+**When should validation fail?**
+
+Validation should fail whenever a required service or application behavior does not meet the expected condition.
+
+The validation fails when, for example:
+
+- A required container is not running.
+- A required container is not healthy.
+- NGINX cannot serve the public endpoint.
+- /health or /ready fails.
+- PostgreSQL or Redis is not ready.
+- /instance does not return a valid backend.
+- Both application instances cannot be reached through NGINX.
+- Required /records or /counter functionality fails.
+- Backend failure/recovery behavior does not meet the expected requirements.
+
+**What does green CI prove?**
+
+A green CI run proves that the tested repository configuration passed the automated checks in the CI environment, including Compose validation, image building, service healthchecks, application validation, and the configured security scan.
+
+It does not prove that the system is completely bug-free or production-ready.
+
+Green CI does not guarantee:
+
+- Production-scale performance.
+- Complete security.
+- No unknown vulnerabilities.
+- High availability of every component.
+- Successful disaster recovery under every failure scenario.
+- Availability of external dependencies.
+
+Therefore, green CI means that the defined automated checks passed, not that every possible production failure has been eliminated.
+
+**Request Flow and Network Design**
+
+Requests enter through the only published host port:
+
+Only NGINX is exposed to the host. The Flask applications, PostgreSQL, and Redis remain internal to the Docker networks.
+
+The frontend network allows NGINX to communicate with the application instances. The backend network allows the application instances to communicate with PostgreSQL and Redis.
+
+Service names are used instead of container IP addresses so that communication remains stable when containers are recreated.
+
+Healthchecks are used because a container being running does not necessarily mean that the application inside it is ready to serve requests. CI therefore waits for all required services to become healthy before running functional validation.
+
+**Timeouts, Retries, Restart Policies and Resource Limits**
+
+Timeouts and retries prevent startup delays or unavailable services from causing tests to hang indefinitely.
+
+The CI healthcheck wait allows services time to initialize while still enforcing a maximum wait period. HTTP validation also uses bounded request timeouts.
+
+The unless-stopped restart policy allows services to recover from unexpected container failures while still respecting intentional shutdowns.
+
+CPU and memory limits prevent a single container from consuming unlimited host resources.
+
+These values are assessment/development defaults. Production values should be tuned using actual startup times, traffic patterns, resource usage, and service-level objectives.
+
+**Remaining Single Points of Failure**
+
+The current architecture provides redundancy at the Flask application layer because two backend instances are available. However, some single points of failure remain:
+
+- A single NGINX container can prevent external access if it fails.
+- A single Docker host can take down the complete stack.
+- A single PostgreSQL instance can make database-dependent functionality unavailable.
+- A single Redis instance can affect functionality that depends on Redis.
+- Local storage can be lost if the Docker host or its storage fails.
+
+For production, these could be improved with multiple NGINX/ingress replicas, multiple hosts or availability zones, highly available PostgreSQL and Redis, off-host backups, automated disaster recovery, and centralized monitoring and alerting.
+
 ## Ports and Networks
 
 The public entry point is:
