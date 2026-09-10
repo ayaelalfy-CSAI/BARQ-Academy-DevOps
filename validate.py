@@ -316,10 +316,6 @@ def check_containers():
             )
             success = False
 
-        # NGINX does not require a Docker healthcheck.
-        if container == "nginx":
-            continue
-
         health = docker_inspect(
             container,
             "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}"
@@ -336,7 +332,6 @@ def check_containers():
             success = False
 
     return success
-
 
 
 def get_ports(container):
