@@ -154,6 +154,7 @@ docker compose logs -f
 
 ```
 
+
 ## Check Health
 
 Check container status:
@@ -192,7 +193,8 @@ healthy
 
 Healthchecks are used because a container being **running** does not necessarily mean that the application inside it is ready to serve requests.
 
-**## Test the Application**
+
+## Test the Application
 
 The main validation script is:
 
@@ -254,6 +256,7 @@ curl http://localhost:8080/instance
 
 ```
 
+
 ## Backend Load-Balancing Test
 
 The validation script checks that both backend instances receive traffic.
@@ -283,6 +286,7 @@ app-02: 5
 The exact distribution is not expected to be perfectly equal because NGINX load balancing does not guarantee an exact 50/50 distribution for a small number of requests.
 
 The important requirement is that **both backends are observed**.
+
 
 ## Backend Failure and Recovery Test
 
@@ -353,6 +357,7 @@ This test demonstrates **backend-level resilience**.
 
 > **Note:** This does not prove complete production high availability because NGINX and PostgreSQL can still be single points of failure.
 
+
 ## Database Backup
 
 The database backup script is:
@@ -389,6 +394,7 @@ ls -lh
 
 ```
 
+
 ## Database Restore
 
 Make the restore script executable:
@@ -417,7 +423,8 @@ python3 validate.py
 
 The `/records` endpoint can be used to verify that persistent application data is still available after the backup/restore procedure.
 
-**## Stop Services**
+
+## Stop Services
 
 To stop the containers without removing them:
 
@@ -436,6 +443,7 @@ docker compose down
 ```
 
 The persistent volumes are not removed by the normal `docker compose down` command.
+
 
 ## Cleanup
 
@@ -468,6 +476,7 @@ docker system prune
 ```
 
 Review the resources before confirming the prune operation.
+
 
 ## CI (Continuous Intergration)
 
@@ -539,6 +548,7 @@ Secrets are not stored directly in the repository.
 
 The Trivy image scan is currently configured as a **non-blocking security check** for the assessment.
 
+
 ## Ports and Networks
 
 The public entry point is:
@@ -562,6 +572,7 @@ Only NGINX is published to the host.
 The application, PostgreSQL, and Redis services communicate through Docker networks.
 
 This reduces the externally exposed attack surface and prevents direct host access to internal services.
+
 
 ## Persistence
 
@@ -590,6 +601,7 @@ Therefore, production deployments should additionally use:
 - Encryption
 
 - Regular restore testing
+
 
 ## Troubleshooting
 
