@@ -10,11 +10,12 @@ The project includes automated validation, backend failure/recovery testing, dat
 
 The application consists of:
 
-nginx — reverse proxy and load balancer
-app-01 — Flask application instance
-app-02 — Flask application instance
-postgres — PostgreSQL database
-redis — Redis service
 
-<img src="/assets/flowReqest.png" alt="flowRequest" width="200">
+- **nginx** — reverse proxy and load balancer
+- **app-01** — Flask application instance
+- **app-02** — Flask application instance
+- **postgres** — PostgreSQL database
+- **redis** — Redis service
+
+<img src="/assets/flowReqest.png" alt="flowRequest" width="900">
 
