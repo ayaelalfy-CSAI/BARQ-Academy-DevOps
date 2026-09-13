@@ -4,6 +4,7 @@ WORKDIR /srv
 RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
 COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
+RUN apt-get update && apt-get install -y --no-install-recommends wget && rm -rf /var/lib/apt/lists/*
 COPY --chown=app:app app/ ./app/
 USER app
 EXPOSE 8080

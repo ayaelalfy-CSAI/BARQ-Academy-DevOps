@@ -9,9 +9,9 @@ x-app: &app
     APP_PORT: "8080"
     APP_MESSAGE: "Welcome to BARQ Systems"
   healthcheck:
-    test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
-    interval: 30s
-    timeout: 10s
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/health"]
+    interval: 10s
+    timeout: 3s
     retries: 3
     start_period: 10s
   networks: [barq-assessment_frontend, barq-assessment_backend]
