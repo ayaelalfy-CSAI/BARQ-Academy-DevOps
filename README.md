@@ -49,6 +49,7 @@ Create the environment file:
 
 ```bash
 cp .env.example .env
+cp config/app.env.example config/app.env
 ```
 
 Edit `.env` and provide the required configuration:
@@ -57,7 +58,13 @@ Edit `.env` and provide the required configuration:
 nano .env
 ```
 
-> **Important:** Do not commit `.env` to Git.
+Edit `config/app.env` and provide the required application configuration:
+
+```bash
+nano config/app.env
+```
+
+> **Important:** Do not commit `.env` or `config/app.env` to Git. These files may contain sensitive credentials.
 
 Verify:
 
@@ -65,7 +72,7 @@ Verify:
 git status
 ```
 
-The `.env` file should not appear as a tracked file.
+The `.env` and `config/app.env` files should not appear as tracked files.
 
 ## Validate Docker Compose Configuration
 
