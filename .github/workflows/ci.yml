@@ -21,6 +21,15 @@ jobs:
           POSTGRES_PASSWORD=${{ secrets.CI_POSTGRES_PASSWORD }}
           PUBLIC_PORT=8080
           EOF
+
+      - name: Create config/app.env for CI
+        run: |
+          mkdir -p config
+          cat <<EOF > config/app.env
+          DATABASE_URL=postgresql://${{ secrets.CI_POSTGRES_USER }}:${{ secrets.CI_POSTGRES_PASSWORD }}@postgres:5432/${{ secrets.CI_POSTGRES_DB }}
+          REDIS_URL=redis://redis:6379/0
+          EOF
+    
  
       # 3. Syntax and Compose checks
       - name: Check Python syntax
